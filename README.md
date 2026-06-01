@@ -1,58 +1,67 @@
 # srvcs-nthroot
 
-The nth-root orchestrator of the srvcs.cloud distributed standard library.
+## Name
 
-Its single concern: **arithmetic: nth root of value (alias of root).** It is a
-thin alias of [`srvcs-root`](https://github.com/srvcs/root): it owns the
-*control flow* but does no arithmetic of its own. It forwards `{"value", "n"}`
-to `srvcs-root` and returns its `result`.
+| Field | Value |
+| --- | --- |
+| Service | `srvcs-nthroot` |
+| Slug | `nthroot` |
+| Repository | `srvcs/nthroot` |
+| Package | `srvcs-nthroot` |
+| Kind | `orchestrator` |
 
-```
-nthroot(value, n):
-    return root(value, n).result
-```
+## Function
 
-The result is a float (an f64 that may be fractional), e.g.
-`nthroot(27, 3) ~= 3.0`.
+arithmetic: nth root of value (alias of root)
 
-Validation is not handled here. This service never calls `srvcs-isnumber`
-directly; instead `srvcs-root` validates its own operands, and any `422` it
-raises is forwarded verbatim.
+## Dependencies
+
+| Dependency | Repository |
+| --- | --- |
+| `srvcs-root` | [srvcs/root](https://github.com/srvcs/root) |
 
 ## API
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/` | Service identity, concern, and dependency list |
-| `POST` | `/` | Compute the nth root of `value` |
-| `GET` | `/healthz` `/readyz` `/metrics` `/openapi.json` | srvcs service standard surface |
+| `GET` | `/` | Service identity |
+| `POST` | `/` | Evaluate the service function |
+| `GET` | `/healthz` | Liveness probe |
+| `GET` | `/readyz` | Readiness probe |
+| `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/openapi.json` | OpenAPI document |
 
-```sh
-curl -s -X POST localhost:8080/ -H 'content-type: application/json' -d '{"value": 27, "n": 3}'
-# {"value":27,"n":3,"result":3.0}
-```
+## Inputs
 
-Responses:
+| Name | Type | Required |
+| --- | --- | --- |
+| `value` | `json` | yes |
+| `n` | `json` | yes |
 
-- `200 {"value": value, "n": n, "result": r}` — evaluated; `result` is a float.
-- `422` — `srvcs-root` rejected the input, forwarded verbatim.
-- `500` — a reachable dependency returned a `200` without a usable result.
-- `503` — `srvcs-root` is unavailable.
+## Outputs
 
-## Dependencies
-
-- [`srvcs-root`](https://github.com/srvcs/root)
+| Name | Type |
+| --- | --- |
+| `value` | `json` |
+| `n` | `json` |
+| `result` | `number` |
 
 ## Configuration
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `SRVCS_BIND_ADDR` | `0.0.0.0:8080` | Bind address |
-| `SRVCS_ROOT_URL` | `http://127.0.0.1:8120` | Base URL of `srvcs-root` |
 | `SRVCS_ENV` | `development` | Environment label for logs |
 | `RUST_LOG` | `info,tower_http=info` | Tracing filter |
+| `SRVCS_ROOT_URL` | `http://127.0.0.1:8120` | Base URL for srvcs-root |
 
-## Local checks
+## Error Behavior
+
+- `422` means the request could not be evaluated for the documented input shape.
+- `503` means a required dependency was unavailable or returned an unexpected response.
+- Dependency validation errors are forwarded when this service delegates validation.
+
+## Local Checks
 
 ```sh
 cargo fmt --check
@@ -60,11 +69,8 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-Orchestration tests stand up a *computing* mock `srvcs-root` service in-process
-— it reads the request body and returns the real `value.powf(1 / n)`, so the
-composition is genuinely exercised against the asserted cases (compared
-approximately, within `1e-9`). See
-[`srvcs/platform`](https://github.com/srvcs/platform) for the shared standard.
+See the [srvcs service standard](https://github.com/srvcs/platform/blob/main/STANDARD.md) for the full operational contract.
 
-> Note: the `cargoHash` in `flake.nix` is inherited from the template and must be
-> refreshed with a `nix build` before the Nix gates pass.
+## Metadata
+
+Machine-readable service metadata lives in `srvcs.yaml`. Keep it aligned with this README when the service contract changes.
